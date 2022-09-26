@@ -14,6 +14,7 @@ const db = mysql.createConnection(
 
 );
 
+// Connect to Mysql Database
 db.connect(function(err) {
     if (err) {
         return console.error('error: ' + err.message);
@@ -22,6 +23,8 @@ db.connect(function(err) {
     startPrompt();
 });
 
+
+// Initialize Prompt
 const startPrompt = () => {
     return inquirer.prompt ([
         {
@@ -32,7 +35,7 @@ const startPrompt = () => {
                 'View All Departments',
                 'View All Roles',
                 'View All Employees',
-                'Add A Departmnet',
+                'Add A Department',
                 'Add A Role',
                 'Add An Employee',
                 'Update An Employee Role',
@@ -64,8 +67,9 @@ const startPrompt = () => {
     })    
 }
 
+// Show All Departments
 showDept = () => {
-    db.query('SELECT * FROM department', (err, results) => {
+    db.query('SELECT id, name AS department FROM department', (err, results) => {
         if (err) {
             console.log(err);
         }
@@ -75,8 +79,9 @@ showDept = () => {
     });
 }
 
+// Show All Roles
 showRoles = () => {
-    db.query('SELECT * FROM role', (err, results) => {
+    db.query('SELECT role.id, role.title, role.salary, department.name AS department FROM role INNER JOIN department ON role.department_id = department.id', (err, results) => {
         if (err) {
             console.log(err);
         }
@@ -86,8 +91,9 @@ showRoles = () => {
     });
 }
 
+// Show All Employees
 showEmployees = () => {
-    db.query('SELECT * FROM employee', (err, results) => {
+    db.query('SELECT employee.id, employee.first_name, employee.last_name, role.title, department.name AS department, role.salary, CONCAT (manager.first_name, " ", manager.last_name) AS manager FROM employee LEFT JOIN role ON employee.role_id = role.id LEFT JOIN department ON role.department_id = department.id LEFT JOIN employee manager ON employee.manager_id = manager.id', (err, results) => {
         if (err) {
             console.log(err);
         }
@@ -96,3 +102,88 @@ showEmployees = () => {
         startPrompt();
     });
 }
+
+// Add A Department
+addDept = () => {
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'dept',
+            message: 'What department do you want to add?'
+        }
+    ]).then (answer => {
+        db.query('INSERT INTO department (name) VALUES (?)', answer.dept, (err, result) => {
+            if (err) {
+                console.log(err)
+            }
+            showDept();
+    
+        })
+    })
+
+};
+
+// Add An Employee
+addEmployee = () => {
+    inquirer.prompt ([
+        {
+            type: 'input',
+            name: 'firstName',
+            message: `What is the employee's first name?`
+        },
+        { 
+            type: 'input',
+            name: 'lastName',
+            message: `What is the employee's last name?`
+        }
+   ]).then(answer => {
+    const input = [answer.firstName, answer.lastName]
+
+    db.query('SELECT id, title FROM role', (err, results) => {
+        if (err) {
+            console.log(err);
+        } const roles = results.map(({ id, title}) => ({ name: title, value: id }));
+
+        inquirer.prompt([
+            {
+                type: 'list',
+                name: 'role',
+                message: `What is the employee's role?`,
+                choices: roles
+            }
+        ]).then(roleChoice => {
+            const role = roleChoice.role;
+            input.push(role);
+
+            db.query('SELECT * FROM employee', (err, results) => {
+                if (err) {
+                    console.log(err);
+                } const manager = results.map(({ id, first_name, last_name}) => ({ name: first_name + " " + last_name, value: id }));
+
+                inquirer.prompt([
+                    {
+                    type: 'list',
+                    name: 'manager',
+                    message: `Who is the employee's manager?`,
+                    choices: manager
+                    }
+                ]).then(managerChoice => {
+                    const manager = managerChoice.manager;
+                    input.push(manager);
+
+                    db.query('INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)',input,(err, results) => {
+                        if (err) {
+                            console.log(err);
+                        } console.log('Employee Added!')
+
+                        showEmployees();
+                    });
+                })
+
+            })
+        })
+
+    })
+})
+};
+
