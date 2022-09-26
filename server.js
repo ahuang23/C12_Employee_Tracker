@@ -1,3 +1,4 @@
+// Import 
 const mysql = require('mysql2');
 const inquirer = require('inquirer');
 const consoleTable = require('console.table');
@@ -10,7 +11,7 @@ const db = mysql.createConnection(
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME
-    },
+    }
 
 );
 
@@ -123,6 +124,50 @@ addDept = () => {
 
 };
 
+// Add A Role
+addRole = () => {
+    inquirer.prompt ([
+        {
+            type: 'input',
+            name: 'role',
+            message: `What role would you like to add?`
+        },
+        {
+            type: 'input',
+            name: 'salary',
+            message: `What is this role's salary?`
+        }
+    ]).then(answer => {
+        const input = [answer.role, answer.salary];
+
+        db.query('SELECT * FROM department', (err, results) => {
+            if (err) {
+                console.log(err)
+            } const dept = results.map(({ name, id }) => ({ name: name, value: id }));
+
+            inquirer.prompt([
+                {
+                type: 'list',
+                name: 'dept',
+                message: 'What department does this role belong to?',
+                choices: dept
+                }
+            ]).then(deptChoice => {
+                const dept = deptChoice.dept;
+                input.push(dept);
+
+                db.query('INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)', input, (err, results) => {
+                    if (err) {
+                        console.log(err);
+                    } console.log('Role Added!');
+
+                    showRoles();
+                }); 
+            })
+        })
+    })
+}
+
 // Add An Employee
 addEmployee = () => {
     inquirer.prompt ([
@@ -186,4 +231,62 @@ addEmployee = () => {
     })
 })
 };
+
+// Update Employee Role
+updateEmployee = () => {
+    db.query('SELECT * FROM employee', (err, results) => {
+        if (err) {
+            console.log(err);
+        } const employees = results.map(({ id, first_name, last_name}) => ({ name: first_name + " " + last_name, value: id}));
+
+        inquirer.prompt([
+            {
+                type: 'list',
+                name: 'name',
+                message: 'Which employee would you like to update?',
+                choices: employees
+
+            }
+        ]).then(employeeChoice => {
+            const employee = employeeChoice.name;
+            const input = [];
+            input.push(employee);
+
+            db.query('SELECT * FROM role', (err, results) => {
+                if (err) {
+                    console.log(err);
+                } const roles = results.map(({ id, title}) =>({ name: title, value: id}));
+                
+                inquirer.prompt([
+                    {
+                        type: 'list',
+                        name: 'role',
+                        message: `What is the employee's new role?`,
+                        choices: roles
+                    }
+
+                ]).then(rolesChoice => {
+                    const role = rolesChoice.role;
+                    input.push(role);
+
+                    // Rearrange input index 
+                    let employee = input[0]
+                    input[0] = role
+                    input[1] = employee
+
+                    db.query('UPDATE employee SET role_id= ? WHERE id = ?', input, (err, results) => {
+                        if (err) {
+                            console.log(err);
+                        } console.log('Employee Role Updated!')
+
+                        showEmployees();
+                    })
+                })
+
+            })
+
+
+        }) 
+    })
+}
 
